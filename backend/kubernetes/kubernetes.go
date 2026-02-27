@@ -66,11 +66,12 @@ func (b *k8sBackend) Search(ctx context.Context, creds *logsift.Credentials, q *
 	}
 
 	var allEntries []logsift.LogEntry
+	var errs []string
 
 	for _, cluster := range clusters {
 		entries, err := b.searchCluster(ctx, cluster, q, maxPerCluster)
 		if err != nil {
-			// Log but continue — partial results from other clusters are still useful.
+			errs = append(errs, fmt.Sprintf("%s: %v", cluster.name, err))
 			continue
 		}
 		allEntries = append(allEntries, entries...)
@@ -79,6 +80,10 @@ func (b *k8sBackend) Search(ctx context.Context, creds *logsift.Credentials, q *
 			allEntries = allEntries[:q.MaxRawEntries]
 			break
 		}
+	}
+
+	if len(allEntries) == 0 && len(errs) > 0 {
+		return nil, fmt.Errorf("kubernetes: all clusters failed: %s", strings.Join(errs, "; "))
 	}
 
 	return &logsift.RawResults{
@@ -95,16 +100,19 @@ func (b *k8sBackend) ListSources(ctx context.Context, creds *logsift.Credentials
 	}
 
 	var sources []logsift.SourceInfo
+	var errs []string
 	seen := make(map[string]bool)
 
 	for _, cluster := range clusters {
 		clientset, err := b.newClientset(cluster)
 		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", cluster.name, err))
 			continue
 		}
 
 		nsList, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", cluster.name, err))
 			continue
 		}
 
@@ -131,6 +139,10 @@ func (b *k8sBackend) ListSources(ctx context.Context, creds *logsift.Credentials
 				return sources, nil
 			}
 		}
+	}
+
+	if len(sources) == 0 && len(errs) > 0 {
+		return nil, fmt.Errorf("kubernetes: all clusters failed: %s", strings.Join(errs, "; "))
 	}
 
 	return sources, nil

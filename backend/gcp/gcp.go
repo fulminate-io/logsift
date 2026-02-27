@@ -64,11 +64,12 @@ func (b *gcpBackend) Search(ctx context.Context, creds *logsift.Credentials, q *
 
 	var allEntries []logsift.LogEntry
 	var totalEstimate int
+	var errs []string
 
 	for _, proj := range projects {
 		entries, estimate, err := b.searchProject(ctx, proj, q, maxPerProject)
 		if err != nil {
-			// Log but continue — partial results from other projects are still useful.
+			errs = append(errs, fmt.Sprintf("%s: %v", proj.projectID, err))
 			continue
 		}
 		allEntries = append(allEntries, entries...)
@@ -78,6 +79,10 @@ func (b *gcpBackend) Search(ctx context.Context, creds *logsift.Credentials, q *
 			allEntries = allEntries[:q.MaxRawEntries]
 			break
 		}
+	}
+
+	if len(allEntries) == 0 && len(errs) > 0 {
+		return nil, fmt.Errorf("gcp: all projects failed: %s", strings.Join(errs, "; "))
 	}
 
 	return &logsift.RawResults{
@@ -94,11 +99,13 @@ func (b *gcpBackend) ListSources(ctx context.Context, creds *logsift.Credentials
 	}
 
 	var sources []logsift.SourceInfo
+	var errs []string
 	seen := make(map[string]bool)
 
 	for _, proj := range projects {
 		client, err := b.newClient(ctx, proj)
 		if err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", proj.projectID, err))
 			continue
 		}
 
@@ -137,6 +144,10 @@ func (b *gcpBackend) ListSources(ctx context.Context, creds *logsift.Credentials
 			}
 		}
 		client.Close()
+	}
+
+	if len(sources) == 0 && len(errs) > 0 {
+		return nil, fmt.Errorf("gcp: all projects failed: %s", strings.Join(errs, "; "))
 	}
 
 	return sources, nil
