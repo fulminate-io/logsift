@@ -127,10 +127,11 @@ func Reduce(entries []LogEntry, opts ReductionOpts) *ReductionResult {
 	truncated, tokensUsed, hasMore := truncateToBudget(clusters, opts.TokenBudget)
 
 	return &ReductionResult{
-		Clusters:   truncated,
-		RawCount:   rawCount,
-		TokensUsed: tokensUsed,
-		HasMore:    hasMore,
+		Clusters:    truncated,
+		RawCount:    rawCount,
+		TokensUsed:  tokensUsed,
+		TokenBudget: opts.TokenBudget,
+		HasMore:     hasMore,
 	}
 }
 

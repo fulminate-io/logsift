@@ -103,47 +103,53 @@ func (b *gcpBackend) ListSources(ctx context.Context, creds *logsift.Credentials
 	seen := make(map[string]bool)
 
 	for _, proj := range projects {
-		client, err := b.newClient(ctx, proj)
+		srcs, err := func() ([]logsift.SourceInfo, error) {
+			client, err := b.newClient(ctx, proj)
+			if err != nil {
+				return nil, err
+			}
+			defer client.Close()
+
+			var result []logsift.SourceInfo
+			it := client.Logs(ctx)
+			for {
+				logName, err := it.Next()
+				if err == iterator.Done {
+					break
+				}
+				if err != nil {
+					break
+				}
+
+				shortName := extractLogID(logName)
+				if prefix != "" && !strings.HasPrefix(strings.ToLower(shortName), strings.ToLower(prefix)) {
+					continue
+				}
+				if seen[shortName] {
+					continue
+				}
+				seen[shortName] = true
+
+				desc := shortName
+				if len(projects) > 1 {
+					desc = fmt.Sprintf("%s (project: %s)", shortName, proj.projectID)
+				}
+				result = append(result, logsift.SourceInfo{
+					Name:        shortName,
+					Description: desc,
+				})
+			}
+			return result, nil
+		}()
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("%s: %v", proj.projectID, err))
 			continue
 		}
-
-		it := client.Logs(ctx)
-		for {
-			logName, err := it.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				break
-			}
-
-			// logName is full path: "projects/<project>/logs/<logID>"
-			shortName := extractLogID(logName)
-			if prefix != "" && !strings.HasPrefix(strings.ToLower(shortName), strings.ToLower(prefix)) {
-				continue
-			}
-			if seen[shortName] {
-				continue
-			}
-			seen[shortName] = true
-
-			desc := shortName
-			if len(projects) > 1 {
-				desc = fmt.Sprintf("%s (project: %s)", shortName, proj.projectID)
-			}
-			sources = append(sources, logsift.SourceInfo{
-				Name:        shortName,
-				Description: desc,
-			})
-
-			if len(sources) >= 100 {
-				client.Close()
-				return sources, nil
-			}
+		sources = append(sources, srcs...)
+		if len(sources) >= 100 {
+			sources = sources[:100]
+			return sources, nil
 		}
-		client.Close()
 	}
 
 	if len(sources) == 0 && len(errs) > 0 {

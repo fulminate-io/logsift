@@ -2,12 +2,13 @@ BINARY  := logsift
 BUILDDIR := build
 BINPATH  := $(CURDIR)/$(BUILDDIR)/$(BINARY)
 SETTINGS := $(HOME)/.claude.json
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 .PHONY: build test setup
 
 build:
 	@mkdir -p $(BUILDDIR)
-	go build -o $(BINPATH) ./cmd/logsift
+	go build -ldflags "-X main.version=$(VERSION)" -o $(BINPATH) ./cmd/logsift
 
 test:
 	go test ./... -count=1

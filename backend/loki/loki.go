@@ -15,6 +15,8 @@ import (
 	logsift "github.com/fulminate-io/logsift"
 )
 
+var lokiHTTPClient = &http.Client{Timeout: 30 * time.Second}
+
 func init() {
 	logsift.Register("loki", &lokiBackend{})
 }
@@ -179,11 +181,12 @@ func (b *lokiBackend) resolveInstances(creds *logsift.Credentials) []lokiInstanc
 	// Fallback to flat fields.
 	if creds.LokiAddress != "" {
 		return []lokiInstance{{
-			name:     "default",
-			address:  strings.TrimRight(creds.LokiAddress, "/"),
-			tenantID: creds.LokiTenantID,
-			username: creds.LokiUsername,
-			password: creds.LokiPassword,
+			name:        "default",
+			address:     strings.TrimRight(creds.LokiAddress, "/"),
+			tenantID:    creds.LokiTenantID,
+			username:    creds.LokiUsername,
+			password:    creds.LokiPassword,
+			bearerToken: creds.LokiBearerToken,
 		}}
 	}
 
@@ -448,7 +451,7 @@ func doRequest(ctx context.Context, inst lokiInstance, method, path string, para
 		req.Header.Set("X-Scope-OrgID", inst.tenantID)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := lokiHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("loki: request to %s: %w", inst.name, err)
 	}

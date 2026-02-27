@@ -46,7 +46,6 @@ type RawResults struct {
 type PaginationCursor struct {
 	Provider      string `json:"p"`
 	ProviderToken string `json:"pt,omitempty"`
-	QueryHash     string `json:"qh"`
 	ClusterOffset int    `json:"co"`
 }
 
@@ -58,12 +57,13 @@ type SourceInfo struct {
 
 // ReductionResult holds the output of the context reduction pipeline.
 type ReductionResult struct {
-	Clusters   []Cluster
-	RawCount   int
-	Sampled    bool
-	TokensUsed int
-	HasMore    bool
-	Cursor     *PaginationCursor
+	Clusters    []Cluster
+	RawCount    int
+	Sampled     bool
+	TokensUsed  int
+	TokenBudget int
+	HasMore     bool
+	Cursor      *PaginationCursor
 }
 
 // Credentials holds provider credentials for log backends.
@@ -80,11 +80,12 @@ type Credentials struct {
 	KubernetesClusters []KubernetesClusterConfig
 
 	// Loki
-	LokiAddress   string             // Single Loki instance URL (e.g., http://localhost:3100)
-	LokiTenantID  string             // X-Scope-OrgID for multi-tenant Loki
-	LokiUsername  string             // Basic auth username
-	LokiPassword  string             // Basic auth password
-	LokiInstances []LokiInstanceConfig // Multiple Loki instances
+	LokiAddress     string               // Single Loki instance URL (e.g., http://localhost:3100)
+	LokiTenantID    string               // X-Scope-OrgID for multi-tenant Loki
+	LokiUsername    string               // Basic auth username
+	LokiPassword    string               // Basic auth password
+	LokiBearerToken string               // Bearer token auth
+	LokiInstances   []LokiInstanceConfig // Multiple Loki instances
 
 	// CloudWatch Logs
 	CloudWatchRegion         string                    // AWS region (e.g., us-east-1)
@@ -124,6 +125,7 @@ type CloudWatchInstanceConfig struct {
 	Profile         string // AWS SSO/config profile name
 	AccessKeyID     string // Static credentials (optional, uses default chain if empty)
 	SecretAccessKey string // Static credentials (optional)
+	SessionToken    string // Session token for temporary credentials (optional)
 	LogGroupPrefix  string // Default log group prefix (e.g., /ecs/prod/)
 }
 

@@ -68,8 +68,8 @@ func TestStructuralConsolidator(t *testing.T) {
 		if !strings.Contains(structural.Template, "Structural output") {
 			t.Errorf("merged template should mention structural, got %q", structural.Template)
 		}
-		if structural.Severity != logsift.SeverityInfo {
-			t.Errorf("structural severity should be INFO, got %s", structural.Severity)
+		if structural.Severity != logsift.SeverityError {
+			t.Errorf("structural severity should propagate max (ERROR), got %s", structural.Severity)
 		}
 		if structural.Count != 8 {
 			t.Errorf("merged count: got %d, want 8", structural.Count)

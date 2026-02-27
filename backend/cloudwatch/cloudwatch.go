@@ -31,6 +31,7 @@ type cwInstance struct {
 	profile         string
 	accessKeyID     string
 	secretAccessKey string
+	sessionToken    string
 	logGroupPrefix  string // optional default log group prefix
 }
 
@@ -126,9 +127,11 @@ func (b *cwBackend) ListSources(ctx context.Context, creds *logsift.Credentials,
 		}
 
 		// Paginate through log groups.
+		var describeErr error
 		for {
 			output, err := client.DescribeLogGroups(ctx, input)
 			if err != nil {
+				describeErr = err
 				break
 			}
 
@@ -158,6 +161,9 @@ func (b *cwBackend) ListSources(ctx context.Context, creds *logsift.Credentials,
 			}
 			input.NextToken = output.NextToken
 		}
+		if describeErr != nil && len(sources) == 0 {
+			errs = append(errs, fmt.Sprintf("%s: %v", inst.name, describeErr))
+		}
 	}
 
 	if len(sources) == 0 && len(errs) > 0 {
@@ -186,6 +192,7 @@ func (b *cwBackend) resolveInstances(creds *logsift.Credentials) []cwInstance {
 				profile:         c.Profile,
 				accessKeyID:     c.AccessKeyID,
 				secretAccessKey: c.SecretAccessKey,
+				sessionToken:    c.SessionToken,
 				logGroupPrefix:  c.LogGroupPrefix,
 			})
 		}
@@ -219,7 +226,7 @@ func (b *cwBackend) newClient(ctx context.Context, inst cwInstance) (*cloudwatch
 
 	if inst.accessKeyID != "" && inst.secretAccessKey != "" {
 		opts = append(opts, config.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(inst.accessKeyID, inst.secretAccessKey, ""),
+			credentials.NewStaticCredentialsProvider(inst.accessKeyID, inst.secretAccessKey, inst.sessionToken),
 		))
 	}
 

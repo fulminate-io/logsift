@@ -53,6 +53,8 @@ import (
 	_ "github.com/fulminate-io/logsift/reducer"
 )
 
+var version = "dev"
+
 func main() {
 	creds := buildCredentials()
 
@@ -131,6 +133,9 @@ func buildCredentials() *logsift.Credentials {
 	if pass := os.Getenv("LOGSIFT_LOKI_PASSWORD"); pass != "" {
 		creds.LokiPassword = pass
 	}
+	if token := os.Getenv("LOGSIFT_LOKI_BEARER_TOKEN"); token != "" {
+		creds.LokiBearerToken = token
+	}
 
 	// CloudWatch Logs: load region, profile, and prefix from env.
 	if region := os.Getenv("LOGSIFT_CW_REGION"); region != "" {
@@ -156,7 +161,7 @@ func handleRequest(creds *logsift.Credentials, req *mcpserver.Request) *mcpserve
 			},
 			ServerInfo: mcpserver.EntityInfo{
 				Name:    "logsift",
-				Version: "0.1.0",
+				Version: version,
 			},
 		})
 
@@ -244,16 +249,19 @@ func listTools() []mcpserver.Tool {
 					"suppress_patterns": {
 						Type:        "array",
 						Description: "Regex patterns for clusters to collapse into noise summary. Use for known noisy patterns (e.g., [\"health.check\", \"processing.*request\"]).",
+						Items:       &mcpserver.Property{Type: "string"},
 					},
 					"severity_keywords": {
 						Type:        "array",
 						Description: "Extra words that trigger INFO->WARN severity uplift. Use for domain-specific problem indicators (e.g., [\"quota\", \"throttle\", \"rate.limit\"]).",
+						Items:       &mcpserver.Property{Type: "string"},
 					},
 					"noise_threshold": {
 						Type:        "integer",
 						Description: "Minimum occurrence count for a cluster to be classified as noise. 0 (default) auto-detects based on count distribution.",
 					},
 				},
+				Required: []string{"provider"},
 			},
 		},
 		{
@@ -274,6 +282,7 @@ func listTools() []mcpserver.Tool {
 						Description: "Optional prefix filter to narrow results",
 					},
 				},
+				Required: []string{"provider"},
 			},
 		},
 	}

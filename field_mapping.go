@@ -20,12 +20,6 @@ var (
 	FieldMappingCloudWatch = FieldMapping{
 		// CloudWatch has no native structured fields — these become filter pattern text matches
 	}
-	FieldMappingDatadog = FieldMapping{
-		FieldService: "service",
-		FieldHost:    "host",
-		FieldLevel:   "status",
-		FieldTraceID: "trace_id",
-	}
 	FieldMappingLoki = FieldMapping{
 		FieldService:   "service_name",
 		FieldHost:      "node",
@@ -34,14 +28,6 @@ var (
 		FieldContainer: "container",
 		FieldLevel:     "level",
 	}
-	FieldMappingElastic = FieldMapping{
-		FieldService:   "service.name",
-		FieldHost:      "host.name",
-		FieldNamespace: "kubernetes.namespace",
-		FieldPod:       "kubernetes.pod.name",
-		FieldContainer: "container.name",
-		FieldLevel:     "log.level",
-	}
 	FieldMappingGCP = FieldMapping{
 		FieldService:   "resource.labels.service_name",
 		FieldHost:      "resource.labels.instance_id",
@@ -49,11 +35,6 @@ var (
 		FieldPod:       "resource.labels.pod_name",
 		FieldContainer: "resource.labels.container_name",
 		FieldLevel:     "severity",
-	}
-	FieldMappingSplunk = FieldMapping{
-		FieldService: "service",
-		FieldHost:    "host",
-		FieldLevel:   "severity",
 	}
 	// FieldMappingKubernetes is an identity mapping — the K8s backend interprets
 	// canonical field names directly via client-side filtering.

@@ -276,6 +276,7 @@ func (b *k8sBackend) searchCluster(ctx context.Context, cluster k8sCluster, q *l
 	sem := make(chan struct{}, maxConcurrent)
 	var mu sync.Mutex
 	var allEntries []logsift.LogEntry
+	var streamErrs []string
 	var wg sync.WaitGroup
 
 	// Build pod log options.
@@ -304,6 +305,9 @@ func (b *k8sBackend) searchCluster(ctx context.Context, cluster k8sCluster, q *l
 
 			stream, err := clientset.CoreV1().Pods(namespace).GetLogs(pc.podName, opts).Stream(ctx)
 			if err != nil {
+				mu.Lock()
+				streamErrs = append(streamErrs, fmt.Sprintf("%s/%s: %v", pc.podName, pc.containerName, err))
+				mu.Unlock()
 				return
 			}
 			defer stream.Close()
@@ -317,6 +321,10 @@ func (b *k8sBackend) searchCluster(ctx context.Context, cluster k8sCluster, q *l
 	}
 
 	wg.Wait()
+
+	if len(allEntries) == 0 && len(streamErrs) > 0 {
+		return nil, fmt.Errorf("kubernetes: all log streams failed in cluster %s: %s", cluster.name, strings.Join(streamErrs, "; "))
+	}
 
 	// Sort by timestamp desc, cap at maxEntries.
 	sort.Slice(allEntries, func(i, j int) bool {

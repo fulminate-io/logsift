@@ -61,9 +61,17 @@ func (s *structuralConsolidator) Consolidate(clusters []logsift.Cluster) []logsi
 			continue
 		}
 
+		// Propagate max severity from group members.
+		maxSev := logsift.SeverityInfo
+		for _, c := range group {
+			if logsift.SeverityAtLeast(c.Severity, maxSev) && c.Severity != maxSev {
+				maxSev = c.Severity
+			}
+		}
+
 		merged := logsift.Cluster{
 			Template:  "Structural output (config dump / status report fragments)",
-			Severity:  logsift.SeverityInfo,
+			Severity:  maxSev,
 			FirstSeen: group[0].FirstSeen,
 			LastSeen:  group[0].LastSeen,
 		}
@@ -131,7 +139,7 @@ func isRawJSONBlob(msg string) bool {
 		return false
 	}
 	// Don't treat as structural if it contains standard log message keys.
-	for _, key := range []string{`"msg"`, `"message"`, `"level"`, `"error"`, `"event"`, `"severity"`} {
+	for _, key := range []string{`"msg"`, `"message"`, `"level"`, `"error"`, `"event"`, `"severity"`, `"log"`, `"body"`, `"text"`, `"description"`} {
 		if strings.Contains(msg, key) {
 			return false
 		}

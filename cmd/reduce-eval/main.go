@@ -68,15 +68,31 @@ func main() {
 		return
 	}
 
-	// Default test cases
-	cases := []testCase{
-		{Name: "api-all", Provider: *provider, Source: "llamacloud-api", TimeRange: "5m", SeverityMin: "INFO", TokenBudget: 4000},
-		{Name: "api-errors", Provider: *provider, Source: "llamacloud-api", TimeRange: "15m", SeverityMin: "ERROR", TokenBudget: 4000},
-		{Name: "api-warn+", Provider: *provider, Source: "llamacloud-api", TimeRange: "5m", SeverityMin: "WARN", TokenBudget: 4000},
-		{Name: "api-large-budget", Provider: *provider, Source: "llamacloud-api", TimeRange: "5m", SeverityMin: "INFO", TokenBudget: 12000},
-		{Name: "jobs-worker", Provider: *provider, Source: "jobs-worker", TimeRange: "5m", SeverityMin: "INFO", TokenBudget: 4000},
-		{Name: "frontend", Provider: *provider, Source: "frontend", TimeRange: "5m", SeverityMin: "INFO", TokenBudget: 4000},
-		{Name: "temporal-parse", Provider: *provider, Source: "temporal-parse", TimeRange: "5m", SeverityMin: "INFO", TokenBudget: 4000},
+	// Default test cases — sources are configurable via REDUCE_EVAL_SOURCES env var
+	// (comma-separated, e.g., "my-api,my-worker,my-frontend").
+	defaultSources := []string{"llamacloud-api", "jobs-worker", "frontend", "temporal-parse"}
+	if envSources := os.Getenv("REDUCE_EVAL_SOURCES"); envSources != "" {
+		defaultSources = nil
+		for _, s := range strings.Split(envSources, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				defaultSources = append(defaultSources, s)
+			}
+		}
+	}
+
+	var cases []testCase
+	if len(defaultSources) > 0 {
+		primary := defaultSources[0]
+		cases = append(cases,
+			testCase{Name: primary + "-all", Provider: *provider, Source: primary, TimeRange: "5m", SeverityMin: "INFO", TokenBudget: 4000},
+			testCase{Name: primary + "-errors", Provider: *provider, Source: primary, TimeRange: "15m", SeverityMin: "ERROR", TokenBudget: 4000},
+			testCase{Name: primary + "-warn+", Provider: *provider, Source: primary, TimeRange: "5m", SeverityMin: "WARN", TokenBudget: 4000},
+			testCase{Name: primary + "-large-budget", Provider: *provider, Source: primary, TimeRange: "5m", SeverityMin: "INFO", TokenBudget: 12000},
+		)
+		for _, s := range defaultSources[1:] {
+			cases = append(cases, testCase{Name: s, Provider: *provider, Source: s, TimeRange: "5m", SeverityMin: "INFO", TokenBudget: 4000})
+		}
 	}
 
 	fmt.Println("=" + strings.Repeat("=", 99))

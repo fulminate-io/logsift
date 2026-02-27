@@ -50,7 +50,7 @@ var (
 	reIPv4    = regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
 	reHexID   = regexp.MustCompile(`\b[0-9a-fA-F]{16,}\b`)
 	reNumeric = regexp.MustCompile(`\b\d{4,}\b`)
-	reURL     = regexp.MustCompile(`https?://[^\s'")\]]{50,}`)
+	reURL     = regexp.MustCompile(`https?://[^\s'")\]]{20,}`)
 )
 
 const drainWildcard = "<*>"
@@ -106,19 +106,14 @@ func (d *drainEngine) AddMessage(msg string) *drainCluster {
 
 	if len(d.clusters) >= drainMaxClusters {
 		best := d.findBestGlobalMatch(tokens)
-		if best != nil {
-			best.count++
-			best.tokens = mergeTokens(best.tokens, tokens)
-			best.template = strings.Join(best.tokens, " ")
-			return best
+		if best == nil {
+			// Force-assign to last cluster to enforce cap.
+			best = d.clusters[len(d.clusters)-1]
 		}
-		c := &drainCluster{
-			tokens:   tokens,
-			template: strings.Join(tokens, " "),
-			count:    1,
-		}
-		d.clusters = append(d.clusters, c)
-		return c
+		best.count++
+		best.tokens = mergeTokens(best.tokens, tokens)
+		best.template = strings.Join(best.tokens, " ")
+		return best
 	}
 
 	c := &drainCluster{

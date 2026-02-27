@@ -165,8 +165,10 @@ func autoExpandWindow(ctx context.Context, b Backend, creds *Credentials, q *Que
 	windows := expandWindows(duration)
 
 	for _, w := range windows {
-		q.EndTime = time.Now()
-		q.StartTime = q.EndTime.Add(-w)
+		end := time.Now()
+		start := end.Add(-w)
+		q.EndTime = end
+		q.StartTime = start
 
 		results, err := b.Search(ctx, creds, q)
 		if err != nil {

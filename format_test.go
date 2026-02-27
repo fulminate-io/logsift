@@ -144,7 +144,6 @@ func TestCursorEncodeDecode(t *testing.T) {
 	cursor := &PaginationCursor{
 		Provider:      "cloudwatch",
 		ProviderToken: "next-token-123",
-		QueryHash:     "abc12345",
 		ClusterOffset: 5,
 	}
 
@@ -159,9 +158,6 @@ func TestCursorEncodeDecode(t *testing.T) {
 	}
 	if decoded.ProviderToken != cursor.ProviderToken {
 		t.Errorf("ProviderToken: got %q, want %q", decoded.ProviderToken, cursor.ProviderToken)
-	}
-	if decoded.QueryHash != cursor.QueryHash {
-		t.Errorf("QueryHash: got %q, want %q", decoded.QueryHash, cursor.QueryHash)
 	}
 	if decoded.ClusterOffset != cursor.ClusterOffset {
 		t.Errorf("ClusterOffset: got %d, want %d", decoded.ClusterOffset, cursor.ClusterOffset)

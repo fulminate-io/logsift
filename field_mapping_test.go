@@ -33,18 +33,9 @@ func TestMapFieldFilters(t *testing.T) {
 			},
 		},
 		{
-			name:    "elastic mapping",
-			filters: map[string]string{"service": "api", "namespace": "production"},
-			mapping: FieldMappingElastic,
-			expected: map[string]string{
-				"service.name":         "api",
-				"kubernetes.namespace": "production",
-			},
-		},
-		{
 			name:    "unknown fields pass through",
 			filters: map[string]string{"service": "api", "custom_field": "value"},
-			mapping: FieldMappingDatadog,
+			mapping: FieldMappingKubernetes,
 			expected: map[string]string{
 				"service":      "api",
 				"custom_field": "value",

@@ -37,7 +37,11 @@ func FormatText(result *ReductionResult, provider, source, timeRange string) str
 		writeCluster(&sb, &c)
 	}
 
-	fmt.Fprintf(&sb, "[%d/%d tokens]", result.TokensUsed, DefaultTokenBudget)
+	tokenBudget := result.TokenBudget
+	if tokenBudget <= 0 {
+		tokenBudget = DefaultTokenBudget
+	}
+	fmt.Fprintf(&sb, "[%d/%d tokens]", result.TokensUsed, tokenBudget)
 	if result.Cursor != nil {
 		cursorStr := EncodeCursor(result.Cursor)
 		fmt.Fprintf(&sb, " [cursor: %s]", cursorStr)
@@ -138,7 +142,7 @@ func FormatJSON(result *ReductionResult, provider, source, timeRange string) str
 			formatNumber(result.RawCount), len(result.Clusters), timeRange, provider, source),
 		Clusters:    jsonClusters,
 		TokensUsed:  result.TokensUsed,
-		TokenBudget: DefaultTokenBudget,
+		TokenBudget: jsonTokenBudget(result),
 		HasMore:     result.HasMore,
 		Cursor:      cursorStr,
 		Sampled:     result.Sampled,
@@ -189,6 +193,13 @@ func formatNumber(n int) string {
 		result = append(result, byte(ch))
 	}
 	return string(result)
+}
+
+func jsonTokenBudget(result *ReductionResult) int {
+	if result.TokenBudget > 0 {
+		return result.TokenBudget
+	}
+	return DefaultTokenBudget
 }
 
 func truncateString(s string, maxLen int) string {
