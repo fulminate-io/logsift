@@ -130,8 +130,8 @@ func TestExtractServiceFromLogGroup(t *testing.T) {
 	}{
 		{"/ecs/prod/api-server", "api-server"},
 		{"/aws/lambda/my-function", "my-function"},
-		{"/llamacloud/platform-staging/application", "application"},
-		{"/aws/rds/cluster/llamacloud-platform-aurora-cluster/postgresql", "postgresql"},
+		{"/myapp/platform-staging/application", "application"},
+		{"/aws/rds/cluster/myapp-aurora-cluster/postgresql", "postgresql"},
 		{"my-log-group", "my-log-group"},
 	}
 

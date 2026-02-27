@@ -5,7 +5,7 @@
 // Usage:
 //
 //	LOGSIFT_LOKI_ADDRESS=http://localhost:3100 go run ./cmd/reduce-eval
-//	LOGSIFT_LOKI_ADDRESS=http://localhost:3100 go run ./cmd/reduce-eval -source llamacloud-api -range 15m
+//	LOGSIFT_LOKI_ADDRESS=http://localhost:3100 go run ./cmd/reduce-eval -source my-api -range 15m
 //	LOGSIFT_LOKI_ADDRESS=http://localhost:3100 go run ./cmd/reduce-eval -all
 package main
 
@@ -70,7 +70,7 @@ func main() {
 
 	// Default test cases — sources are configurable via REDUCE_EVAL_SOURCES env var
 	// (comma-separated, e.g., "my-api,my-worker,my-frontend").
-	defaultSources := []string{"llamacloud-api", "jobs-worker", "frontend", "temporal-parse"}
+	defaultSources := []string{"api", "worker", "frontend"}
 	if envSources := os.Getenv("REDUCE_EVAL_SOURCES"); envSources != "" {
 		defaultSources = nil
 		for _, s := range strings.Split(envSources, ",") {
