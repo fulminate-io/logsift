@@ -51,6 +51,15 @@ func TestIsGoStackFragment(t *testing.T) {
 		{"normal log", logsift.Cluster{Template: "connection timeout after 3200ms", Examples: []string{"connection timeout after 3200ms"}}, false},
 		{"normal error msg", logsift.Cluster{Template: "Error exporting metrics to UAS", Examples: []string{"Error exporting metrics to UAS"}}, false},
 		{"normal with parens", logsift.Cluster{Template: "Failed to get pod prod/agent-chat-node-warmer-rz4q6 pods not found", Examples: []string{"Failed to get pod prod/agent-chat-node-warmer-rz4q6 pods not found"}}, false},
+		// False positives from infrastructure logs — must NOT match.
+		{"k8s audit json", logsift.Cluster{Template: `{"annotations":{"authorization.k8s.io/decision":"allow"},"apiVersion":"audit.k8s.io/v1","auditID":"abc"}`, Examples: []string{`{"annotations":{"authorization.k8s.io/decision":"allow"},"apiVersion":"audit.k8s.io/v1","auditID":"abc"}`}}, false},
+		{"postgresql log", logsift.Cluster{Template: "2026-02-27 18:47:01 UTC:10.0.44.136(59262):llama_platform_dbuser@llama_platform_db:[25084]:LOG:  could not receive data from client: Connection reset by peer", Examples: []string{"2026-02-27 18:47:01 UTC:10.0.44.136(59262):llama_platform_dbuser@llama_platform_db:[25084]:LOG:  could not receive data from client: Connection reset by peer"}}, false},
+		{"logrus auth line", logsift.Cluster{Template: `time="2026-02-27T18:01:01Z" level=info msg="access granted" arn="arn:aws:iam::927209226484:role/Foo"`, Examples: []string{`time="2026-02-27T18:01:01Z" level=info msg="access granted" arn="arn:aws:iam::927209226484:role/Foo"`}}, false},
+		{"rabbitmq warning", logsift.Cluster{Template: `2026-02-27 04:18:36.878494+00:00 [warning] <0.60219548.0> Deprecated features: management_metrics_collection`, Examples: []string{`2026-02-27 04:18:36.878494+00:00 [warning] <0.60219548.0> Deprecated features: management_metrics_collection`}}, false},
+		{"lambda report", logsift.Cluster{Template: "REPORT RequestId: e5c92e31 Duration: 91.90 ms Billed Duration: 92 ms", Examples: []string{"REPORT RequestId: e5c92e31 Duration: 91.90 ms Billed Duration: 92 ms"}}, false},
+		{"k8s warning log", logsift.Cluster{Template: `W0227 18:04:49.468376      12 dispatcher.go:210] Failed calling webhook, failing open`, Examples: []string{`W0227 18:04:49.468376      12 dispatcher.go:210] Failed calling webhook, failing open`}}, false},
+		{"k8s info log", logsift.Cluster{Template: `I0227 18:05:27.012628      11 httplog.go:92] arn:aws:sts::470522838653:assumed-role/foo`, Examples: []string{`I0227 18:05:27.012628      11 httplog.go:92] arn:aws:sts::470522838653:assumed-role/foo`}}, false},
+		{"k8s error log", logsift.Cluster{Template: `E0227 18:04:49.468420      12 dispatcher.go:214] "Unhandled Error" err="failed calling webhook"`, Examples: []string{`E0227 18:04:49.468420      12 dispatcher.go:214] "Unhandled Error" err="failed calling webhook"`}}, false},
 	}
 
 	for _, tt := range tests {

@@ -50,6 +50,7 @@ var (
 	reIPv4    = regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
 	reHexID   = regexp.MustCompile(`\b[0-9a-fA-F]{16,}\b`)
 	reNumeric = regexp.MustCompile(`\b\d{4,}\b`)
+	reURL     = regexp.MustCompile(`https?://[^\s'")\]]{50,}`)
 )
 
 const drainWildcard = "<*>"
@@ -68,6 +69,7 @@ func preProcess(msg string) string {
 	msg = reIPv4.ReplaceAllString(msg, drainWildcard)
 	msg = reHexID.ReplaceAllString(msg, drainWildcard)
 	msg = reNumeric.ReplaceAllString(msg, drainWildcard)
+	msg = reURL.ReplaceAllString(msg, "<url>")
 	return msg
 }
 

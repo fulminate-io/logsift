@@ -103,6 +103,7 @@ var (
 	reJSONKeyFragment = regexp.MustCompile(`^\s*"[a-zA-Z_]\w*"\s*:\s*(\[\]|{})?\s*,?\s*$`)
 	reWildcardHeavy   = regexp.MustCompile(`^(<\*>\s*){3,}$`)
 	reServiceListing  = regexp.MustCompile(`^[\w._-]+\s+\((systemd|tail)\)$`)
+	reJSONBlob        = regexp.MustCompile(`^\{"[a-zA-Z]`)
 )
 
 func isStructuralFragment(c *logsift.Cluster) bool {
@@ -119,7 +120,23 @@ func matchesStructuralPattern(msg string) bool {
 		reTreePrefix.MatchString(msg) ||
 		reJSONKeyFragment.MatchString(msg) ||
 		reWildcardHeavy.MatchString(msg) ||
-		reServiceListing.MatchString(msg)
+		reServiceListing.MatchString(msg) ||
+		isRawJSONBlob(msg)
+}
+
+// isRawJSONBlob detects JSON data dumps (e.g., S3 operations, timing data)
+// that lack standard log message keys and are just structural data payloads.
+func isRawJSONBlob(msg string) bool {
+	if !reJSONBlob.MatchString(msg) {
+		return false
+	}
+	// Don't treat as structural if it contains standard log message keys.
+	for _, key := range []string{`"msg"`, `"message"`, `"level"`, `"error"`, `"event"`, `"severity"`} {
+		if strings.Contains(msg, key) {
+			return false
+		}
+	}
+	return true
 }
 
 func isPunctuationOnly(s string) bool {

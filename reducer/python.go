@@ -129,11 +129,12 @@ func (p *pythonTracebackConsolidator) Consolidate(clusters []logsift.Cluster) []
 var (
 	rePyFileFrame      = regexp.MustCompile(`(?m)^\s+File "`)
 	rePyUnderline      = regexp.MustCompile(`(?m)^\s+[\^~]{5,}`)
-	rePyRaiseAwait     = regexp.MustCompile(`(?m)^\s+(raise |await |return await |with \w)`)
-	rePySelfCall       = regexp.MustCompile(`(?m)^\s+self\.\w+`)
+	rePyRaiseAwait     = regexp.MustCompile(`(?m)^\s*(raise |await |return await |return \w+[\.(]|with \w)`)
+	rePySelfCall       = regexp.MustCompile(`(?m)^\s*self\.\w+`)
 	rePyAssignAwait    = regexp.MustCompile(`(?m)=\s+await\s+`)
 	rePyExceptionClass = regexp.MustCompile(`(?m)^\w+(\.\w+)*\.\w*(Timeout|Error|Exception|Fault)\b`)
 	rePyExceptionChain = regexp.MustCompile(`(?i)^(The above exception|During handling of the above)`)
+	rePyObjectRepr     = regexp.MustCompile(`(?m)^\w+:\s+<[\w.]+\s+object\s+at\s+0x`)
 )
 
 func isPythonTracebackFragment(c *logsift.Cluster) bool {
@@ -148,5 +149,6 @@ func matchesPyTracebackPattern(msg string) bool {
 		rePyAssignAwait.MatchString(msg) ||
 		rePyExceptionClass.MatchString(msg) ||
 		rePyExceptionChain.MatchString(msg) ||
-		rePyFileFrame.MatchString(msg)
+		rePyFileFrame.MatchString(msg) ||
+		rePyObjectRepr.MatchString(msg)
 }

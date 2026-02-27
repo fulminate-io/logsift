@@ -50,15 +50,20 @@ func FormatText(result *ReductionResult, provider, source, timeRange string) str
 func writeCluster(sb *strings.Builder, c *Cluster) {
 	sym := SeveritySymbol(c.Severity)
 
+	tpl := truncateString(c.Template, 200)
 	if c.Count == 1 {
-		fmt.Fprintf(sb, "%s %s [x1] %s\n", sym, c.Severity, c.Template)
+		fmt.Fprintf(sb, "%s %s [x1] %s\n", sym, c.Severity, tpl)
 	} else {
 		timeRange := formatTimeRange(c)
-		fmt.Fprintf(sb, "%s %s [x%d, %s] %s\n", sym, c.Severity, c.Count, timeRange, c.Template)
+		fmt.Fprintf(sb, "%s %s [x%d, %s] %s\n", sym, c.Severity, c.Count, timeRange, tpl)
 	}
 
-	for _, ex := range c.Examples {
-		fmt.Fprintf(sb, "  -> %s\n", truncateString(ex, 120))
+	// Skip examples when the template has no wildcards (example == template)
+	// or when the cluster has no examples (noise-compressed clusters).
+	if strings.Contains(c.Template, "<*>") {
+		for _, ex := range c.Examples {
+			fmt.Fprintf(sb, "  -> %s\n", truncateString(ex, 120))
+		}
 	}
 	sb.WriteString("\n")
 }

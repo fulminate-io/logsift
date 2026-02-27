@@ -17,6 +17,8 @@ var reEmbeddedLevel = regexp.MustCompile(
 		`\t(trace|debug|info|warn(?:ing)?|error|fatal|panic)\t` + // \tinfo\t (zerolog tab-delimited)
 		`|` +
 		`\[(TRACE|DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|PANIC)\]` + // [INFO] (bracket style)
+		`|` +
+		`^(TRACE|DEBUG|INFO|WARNI?(?:NG)?|ERROR|FATAL|PANIC|CRITICAL)\s` + // ERROR [asyncio] (severity at start of line)
 		`)`,
 )
 
@@ -45,10 +47,16 @@ func DetectEmbeddedSeverity(msg string) string {
 // Tries common field names in priority order.
 func ExtractMessageFromMap(m map[string]any) string {
 	// Try common message fields first.
-	for _, key := range []string{"message", "msg", "textPayload", "log", "body"} {
+	for _, key := range []string{"message", "msg", "event", "textPayload", "log", "body"} {
 		if v, ok := m[key]; ok {
 			if s, ok := v.(string); ok && s != "" {
 				return s
+			}
+			// If the field is a nested object, recurse into it.
+			if nested, ok := v.(map[string]any); ok {
+				if s := ExtractMessageFromMap(nested); s != "" {
+					return s
+				}
 			}
 		}
 	}

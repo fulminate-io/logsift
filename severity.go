@@ -33,7 +33,7 @@ func ParseSeverity(s string) string {
 		return SeverityDebug
 	case SeverityInfo, "INFORMATION", "NOTICE":
 		return SeverityInfo
-	case SeverityWarn, "WARNING":
+	case SeverityWarn, "WARNING", "WARNI":
 		return SeverityWarn
 	case SeverityError, "ERR", "SEVERE", "FATAL":
 		return SeverityError
