@@ -1,5 +1,5 @@
 // Package main provides a stdio-based MCP server for searching and reducing
-// logs from GCP Cloud Logging and Kubernetes pod logs.
+// logs from GCP Cloud Logging, Kubernetes pod logs, Loki, and CloudWatch Logs.
 //
 // Configure as an MCP server in Claude Code or any MCP-compatible client:
 //
@@ -9,7 +9,9 @@
 //	      "command": "logsift",
 //	      "env": {
 //	        "LOGSIFT_GCP_PROJECTS": "my-project-1,my-project-2",
-//	        "KUBECONFIG": "~/.kube/config"
+//	        "KUBECONFIG": "~/.kube/config",
+//	        "LOGSIFT_LOKI_ADDRESS": "http://localhost:3100",
+//	        "LOGSIFT_CW_REGION": "us-east-1"
 //	      }
 //	    }
 //	  }
@@ -21,6 +23,13 @@
 //   - LOGSIFT_GCP_SERVICE_ACCOUNT_JSON: Path to service account key file
 //   - KUBECONFIG: Path to kubeconfig file (defaults to ~/.kube/config)
 //   - LOGSIFT_KUBE_CONTEXT: Kubernetes context to use (defaults to current)
+//   - LOGSIFT_LOKI_ADDRESS: Loki base URL (e.g., http://localhost:3100)
+//   - LOGSIFT_LOKI_TENANT_ID: X-Scope-OrgID for multi-tenant Loki
+//   - LOGSIFT_LOKI_USERNAME: Basic auth username for Loki
+//   - LOGSIFT_LOKI_PASSWORD: Basic auth password for Loki
+//   - LOGSIFT_CW_REGION: AWS region for CloudWatch Logs (e.g., us-east-1)
+//   - LOGSIFT_CW_PROFILE: AWS SSO/config profile name (optional)
+//   - LOGSIFT_CW_LOG_GROUP_PREFIX: Default log group prefix (e.g., /ecs/prod/)
 package main
 
 import (
@@ -37,8 +46,10 @@ import (
 	"github.com/fulminate-io/logsift/mcpserver"
 
 	// Blank imports trigger backend and reducer init() registration.
+	_ "github.com/fulminate-io/logsift/backend/cloudwatch"
 	_ "github.com/fulminate-io/logsift/backend/gcp"
 	_ "github.com/fulminate-io/logsift/backend/kubernetes"
+	_ "github.com/fulminate-io/logsift/backend/loki"
 	_ "github.com/fulminate-io/logsift/reducer"
 )
 
@@ -105,6 +116,31 @@ func buildCredentials() *logsift.Credentials {
 	}
 	if ctx := os.Getenv("LOGSIFT_KUBE_CONTEXT"); ctx != "" {
 		creds.KubeContext = ctx
+	}
+
+	// Loki: load address and auth from env.
+	if addr := os.Getenv("LOGSIFT_LOKI_ADDRESS"); addr != "" {
+		creds.LokiAddress = addr
+	}
+	if tenant := os.Getenv("LOGSIFT_LOKI_TENANT_ID"); tenant != "" {
+		creds.LokiTenantID = tenant
+	}
+	if user := os.Getenv("LOGSIFT_LOKI_USERNAME"); user != "" {
+		creds.LokiUsername = user
+	}
+	if pass := os.Getenv("LOGSIFT_LOKI_PASSWORD"); pass != "" {
+		creds.LokiPassword = pass
+	}
+
+	// CloudWatch Logs: load region, profile, and prefix from env.
+	if region := os.Getenv("LOGSIFT_CW_REGION"); region != "" {
+		creds.CloudWatchRegion = region
+	}
+	if profile := os.Getenv("LOGSIFT_CW_PROFILE"); profile != "" {
+		creds.CloudWatchProfile = profile
+	}
+	if prefix := os.Getenv("LOGSIFT_CW_LOG_GROUP_PREFIX"); prefix != "" {
+		creds.CloudWatchLogGroupPrefix = prefix
 	}
 
 	return creds
@@ -204,6 +240,18 @@ func listTools() []mcpserver.Tool {
 					"cursor": {
 						Type:        "string",
 						Description: "Opaque pagination cursor from a previous search_logs call",
+					},
+					"suppress_patterns": {
+						Type:        "array",
+						Description: "Regex patterns for clusters to collapse into noise summary. Use for known noisy patterns (e.g., [\"health.check\", \"processing.*request\"]).",
+					},
+					"severity_keywords": {
+						Type:        "array",
+						Description: "Extra words that trigger INFO->WARN severity uplift. Use for domain-specific problem indicators (e.g., [\"quota\", \"throttle\", \"rate.limit\"]).",
+					},
+					"noise_threshold": {
+						Type:        "integer",
+						Description: "Minimum occurrence count for a cluster to be classified as noise. 0 (default) auto-detects based on count distribution.",
 					},
 				},
 			},

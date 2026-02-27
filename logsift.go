@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -89,12 +90,23 @@ func Search(ctx context.Context, provider string, creds *Credentials, input *Sea
 		return guidance, nil
 	}
 
+	// Compile user-provided suppress patterns.
+	var suppressPatterns []*regexp.Regexp
+	for _, p := range input.SuppressPatterns {
+		if re, err := regexp.Compile("(?i)" + p); err == nil {
+			suppressPatterns = append(suppressPatterns, re)
+		}
+	}
+
 	// Run reduction pipeline.
 	sampled := results.TotalEstimate > len(results.Entries) && results.TotalEstimate > 0
 	reduction := Reduce(results.Entries, ReductionOpts{
-		SeverityMin: q.SeverityMin,
-		TokenBudget: q.TokenBudget,
-		Cursor:      cursor,
+		SeverityMin:      q.SeverityMin,
+		TokenBudget:      q.TokenBudget,
+		Cursor:           cursor,
+		SuppressPatterns: suppressPatterns,
+		SeverityKeywords: input.SeverityKeywords,
+		NoiseThreshold:   input.NoiseThreshold,
 	})
 	reduction.Sampled = sampled
 

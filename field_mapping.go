@@ -28,7 +28,7 @@ var (
 	}
 	FieldMappingLoki = FieldMapping{
 		FieldService:   "service_name",
-		FieldHost:      "hostname",
+		FieldHost:      "node",
 		FieldNamespace: "namespace",
 		FieldPod:       "pod",
 		FieldContainer: "container",

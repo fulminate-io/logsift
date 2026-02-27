@@ -78,6 +78,19 @@ type Credentials struct {
 	KubeconfigContent  string
 	KubeContext        string
 	KubernetesClusters []KubernetesClusterConfig
+
+	// Loki
+	LokiAddress   string             // Single Loki instance URL (e.g., http://localhost:3100)
+	LokiTenantID  string             // X-Scope-OrgID for multi-tenant Loki
+	LokiUsername  string             // Basic auth username
+	LokiPassword  string             // Basic auth password
+	LokiInstances []LokiInstanceConfig // Multiple Loki instances
+
+	// CloudWatch Logs
+	CloudWatchRegion         string                    // AWS region (e.g., us-east-1)
+	CloudWatchProfile        string                    // AWS SSO/config profile name
+	CloudWatchLogGroupPrefix string                    // Default log group prefix (e.g., /ecs/prod/)
+	CloudWatchInstances      []CloudWatchInstanceConfig // Multiple CloudWatch instances
 }
 
 // GCPProjectConfig holds credentials for a single GCP project.
@@ -94,6 +107,26 @@ type KubernetesClusterConfig struct {
 	Context           string
 }
 
+// LokiInstanceConfig holds credentials for a single Loki instance.
+type LokiInstanceConfig struct {
+	Name        string
+	Address     string // Base URL (e.g., http://loki-query-frontend:3100)
+	TenantID    string // X-Scope-OrgID header value
+	Username    string // Basic auth username
+	Password    string // Basic auth password
+	BearerToken string // Bearer token auth
+}
+
+// CloudWatchInstanceConfig holds credentials for a single CloudWatch Logs instance.
+type CloudWatchInstanceConfig struct {
+	Name            string
+	Region          string // AWS region (e.g., us-east-1)
+	Profile         string // AWS SSO/config profile name
+	AccessKeyID     string // Static credentials (optional, uses default chain if empty)
+	SecretAccessKey string // Static credentials (optional)
+	LogGroupPrefix  string // Default log group prefix (e.g., /ecs/prod/)
+}
+
 // SearchLogsInput is the JSON input schema for the search_logs tool.
 type SearchLogsInput struct {
 	Provider     string            `json:"provider"`
@@ -106,6 +139,11 @@ type SearchLogsInput struct {
 	Mode         string            `json:"mode,omitempty"`
 	TokenBudget  int               `json:"token_budget,omitempty"`
 	Cursor       string            `json:"cursor,omitempty"`
+
+	// Reducer tuning (optional, for domain-specific control).
+	SuppressPatterns []string `json:"suppress_patterns,omitempty"` // Regex patterns to collapse into noise summary
+	SeverityKeywords []string `json:"severity_keywords,omitempty"` // Extra words that trigger INFO→WARN uplift
+	NoiseThreshold   int      `json:"noise_threshold,omitempty"`   // Min count to consider a cluster noise (0=auto)
 }
 
 // ListLogSourcesInput is the JSON input schema for the list_log_sources tool.

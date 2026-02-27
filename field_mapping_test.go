@@ -29,7 +29,7 @@ func TestMapFieldFilters(t *testing.T) {
 			mapping: FieldMappingLoki,
 			expected: map[string]string{
 				"service_name": "api",
-				"hostname":     "web-01",
+				"node":         "web-01",
 			},
 		},
 		{
