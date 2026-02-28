@@ -91,8 +91,6 @@ Ask your AI assistant "what errors are happening in prod?" and logsift returns:
   -> Failed handling activation on workflow with run ID 019c9b5f-26ce-7c50-b9a5-f068bdf3e013
   -> Failed handling activation on workflow with run ID 019c9b27-6c3f-76f3-8e02-6a2552498721
 
-!! ERROR [x22, 17:29-17:30] OCR Error <*> timeout of 45000ms exceeded <*> 9 retries left
-
 !! ERROR [x9, 17:29-17:31] Worker startup attempt 1/3 failed: <*>
 
   INFO [x50, 17:30-17:32] processing http request
