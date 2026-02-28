@@ -92,6 +92,53 @@ type Credentials struct {
 	CloudWatchProfile        string                    // AWS SSO/config profile name
 	CloudWatchLogGroupPrefix string                    // Default log group prefix (e.g., /ecs/prod/)
 	CloudWatchInstances      []CloudWatchInstanceConfig // Multiple CloudWatch instances
+
+	// Axiom
+	AxiomToken    string              // API token (xaat-...) or Personal Access Token (xapt-...)
+	AxiomOrgID    string              // Organization ID (required for Personal Access Tokens)
+	AxiomURL      string              // Custom API URL (default: https://api.axiom.co)
+	AxiomInstances []AxiomInstanceConfig // Multiple Axiom instances
+
+	// Datadog
+	DatadogAPIKey    string                  // API key (identifies organization)
+	DatadogAppKey    string                  // Application key (carries permissions)
+	DatadogSite      string                  // Datadog site (e.g., datadoghq.com, datadoghq.eu, us3.datadoghq.com)
+	DatadogInstances []DatadogInstanceConfig // Multiple Datadog instances
+
+	// Azure Monitor Log Analytics
+	AzureTenantID     string                       // Azure AD tenant ID
+	AzureClientID     string                       // Service principal app/client ID
+	AzureClientSecret string                       // Client secret value
+	AzureWorkspaceID  string                       // Log Analytics workspace GUID
+	AzureInstances    []AzureMonitorInstanceConfig  // Multiple workspaces
+
+	// Sumo Logic
+	SumoLogicAccessID  string                      // Access ID
+	SumoLogicAccessKey string                      // Access Key
+	SumoLogicURL       string                      // API endpoint (e.g., https://api.us2.sumologic.com)
+	SumoLogicInstances []SumoLogicInstanceConfig   // Multiple instances
+
+	// New Relic
+	NewRelicAPIKey     string                     // User API key (NRAK-...)
+	NewRelicAccountID  int                        // Account ID
+	NewRelicRegion     string                     // "US" (default) or "EU"
+	NewRelicInstances  []NewRelicInstanceConfig   // Multiple accounts
+
+	// Splunk
+	SplunkURL          string                  // Base URL (e.g., https://splunk.example.com:8089)
+	SplunkToken        string                  // Bearer or Splunk auth token
+	SplunkUsername     string                  // Username for session-based auth
+	SplunkPassword     string                  // Password for session-based auth
+	SplunkTLSSkipVerify bool                   // Skip TLS verification (dev only)
+	SplunkInstances    []SplunkInstanceConfig  // Multiple Splunk instances
+
+	// Elasticsearch / OpenSearch
+	ElasticsearchAddresses []string                       // Cluster addresses (e.g., https://localhost:9200)
+	ElasticsearchUsername  string                          // Basic auth username
+	ElasticsearchPassword  string                          // Basic auth password
+	ElasticsearchAPIKey    string                          // API key (base64-encoded id:api_key)
+	ElasticsearchCloudID   string                          // Elastic Cloud deployment ID
+	ElasticsearchInstances []ElasticsearchInstanceConfig   // Multiple instances
 }
 
 // GCPProjectConfig holds credentials for a single GCP project.
@@ -127,6 +174,68 @@ type CloudWatchInstanceConfig struct {
 	SecretAccessKey string // Static credentials (optional)
 	SessionToken    string // Session token for temporary credentials (optional)
 	LogGroupPrefix  string // Default log group prefix (e.g., /ecs/prod/)
+}
+
+// AxiomInstanceConfig holds credentials for a single Axiom instance.
+type AxiomInstanceConfig struct {
+	Name   string // Display name for this instance
+	Token  string // API token or Personal Access Token
+	OrgID  string // Organization ID (required for Personal Access Tokens)
+	URL    string // Custom API URL (e.g., https://api.eu.axiom.co)
+}
+
+// DatadogInstanceConfig holds credentials for a single Datadog instance.
+type DatadogInstanceConfig struct {
+	Name   string // Display name for this instance
+	APIKey string // API key (identifies organization)
+	AppKey string // Application key (carries permissions)
+	Site   string // Datadog site (e.g., datadoghq.com, datadoghq.eu)
+}
+
+// AzureMonitorInstanceConfig holds credentials for a single Azure Monitor Log Analytics workspace.
+type AzureMonitorInstanceConfig struct {
+	Name         string // Display name for this workspace
+	TenantID     string // Azure AD tenant ID
+	ClientID     string // Service principal app/client ID
+	ClientSecret string // Client secret value
+	WorkspaceID  string // Log Analytics workspace GUID
+}
+
+// SumoLogicInstanceConfig holds credentials for a single Sumo Logic deployment.
+type SumoLogicInstanceConfig struct {
+	Name      string // Display name for this instance
+	AccessID  string // Access ID
+	AccessKey string // Access Key
+	URL       string // API endpoint (e.g., https://api.us2.sumologic.com)
+}
+
+// NewRelicInstanceConfig holds credentials for a single New Relic account.
+type NewRelicInstanceConfig struct {
+	Name      string // Display name for this account
+	APIKey    string // User API key (NRAK-...)
+	AccountID int    // Account ID
+	Region    string // "US" (default) or "EU"
+}
+
+// SplunkInstanceConfig holds credentials for a single Splunk instance.
+type SplunkInstanceConfig struct {
+	Name           string // Display name for this instance
+	URL            string // Base URL (e.g., https://splunk.example.com:8089)
+	Token          string // Bearer or Splunk auth token
+	Username       string // Username for session-based auth
+	Password       string // Password for session-based auth
+	TLSSkipVerify  bool   // Skip TLS verification (dev only)
+}
+
+// ElasticsearchInstanceConfig holds credentials for a single Elasticsearch or OpenSearch instance.
+type ElasticsearchInstanceConfig struct {
+	Name      string   // Display name for this instance
+	Addresses []string // Cluster addresses (e.g., https://localhost:9200)
+	Username  string   // Basic auth username
+	Password  string   // Basic auth password
+	APIKey    string   // API key (base64-encoded id:api_key, ES only)
+	CloudID   string   // Elastic Cloud deployment ID (ES only)
+	CACert    string   // PEM-encoded CA certificate
 }
 
 // SearchLogsInput is the JSON input schema for the search_logs tool.

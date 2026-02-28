@@ -21,11 +21,13 @@ Works with any MCP-compatible client — Claude Code, Cursor, Windsurf, or your 
 | GCP Cloud Logging | Stable | Log name |
 | Grafana Loki | Stable | Namespace |
 | Kubernetes Pod Logs | Stable | Namespace |
-| Datadog | [Help wanted](#adding-a-new-backend) | — |
-| Splunk | [Help wanted](#adding-a-new-backend) | — |
-| Elastic / OpenSearch | [Help wanted](#adding-a-new-backend) | — |
-| Azure Monitor | [Help wanted](#adding-a-new-backend) | — |
-| Sumo Logic | [Help wanted](#adding-a-new-backend) | — |
+| Axiom | Stable | Dataset name |
+| Azure Monitor | Stable | Table name (default: `ContainerLogV2`) |
+| Datadog | Stable | Index name |
+| Elastic / OpenSearch | Stable | Index name |
+| New Relic | Stable | Log type |
+| Splunk | Stable | Index name |
+| Sumo Logic | Stable | Source category |
 
 ## Supported Stack Consolidators
 
@@ -67,8 +69,10 @@ Add to your MCP client config (e.g., `~/.claude.json` for Claude Code):
       "command": "logsift",
       "env": {
         "LOGSIFT_LOKI_ADDRESS": "http://localhost:3100",
-        "LOGSIFT_CW_REGION": "us-east-1",
+        "AWS_REGION": "us-east-1",
         "LOGSIFT_GCP_PROJECTS": "my-project",
+        "DD_API_KEY": "your-api-key",
+        "DD_APP_KEY": "your-app-key",
         "KUBECONFIG": "~/.kube/config"
       }
     }
@@ -76,7 +80,7 @@ Add to your MCP client config (e.g., `~/.claude.json` for Claude Code):
 }
 ```
 
-Only set env vars for the backends you use. See [Configuration](#configuration) for the full list.
+Only set env vars for the backends you use — logsift auto-detects which backends are available based on configured credentials. See [Configuration](#configuration) for the full list.
 
 ## Example Output
 
@@ -109,9 +113,14 @@ Ask your AI assistant "what errors are happening in prod?" and logsift returns:
 ```
 ┌─────────────┐     ┌──────────────────────┐     ┌──────────────┐
 │  MCP Client │────▶│      logsift         │────▶│   Backends   │
-│  (Claude,   │◀────│    stdio JSON-RPC    │◀────│  GCP | K8s   │
-│   Cursor)   │     │                      │     │  Loki | CW   │
-└─────────────┘     └──────────┬───────────┘     └──────────────┘
+│  (Claude,   │◀────│    stdio JSON-RPC    │◀────│              │
+│   Cursor)   │     │                      │     │  CW  | GCP   │
+└─────────────┘     └──────────┬───────────┘     │  K8s | Loki  │
+                               │                 │  Axiom| Azure│
+                               │                 │  DD  | ES    │
+                               │                 │  NR  | Splunk│
+                               │                 │  Sumo|       │
+                               │                 └──────────────┘
                                │
                     ┌──────────▼───────────┐
                     │  Reduction Pipeline  │
@@ -126,7 +135,7 @@ Ask your AI assistant "what errors are happening in prod?" and logsift returns:
                     └──────────────────────┘
 ```
 
-**Backends** translate queries into provider-native syntax (LogQL, GCP Advanced Logs Filter, CloudWatch Filter Patterns, kubectl) and return normalized `LogEntry` structs.
+**Backends** translate queries into provider-native syntax (LogQL, KQL, SPL, NRQL, Elasticsearch Query DSL, etc.) and return normalized `LogEntry` structs. Multi-instance backends query all configured instances in parallel and merge results.
 
 **The Drain algorithm** (step 3) groups log messages into template patterns. It tokenizes messages, replaces variable parts (UUIDs, IPs, timestamps) with `<*>` wildcards, and merges similar patterns using a prefix-tree with similarity matching.
 
@@ -140,7 +149,7 @@ Ask your AI assistant "what errors are happening in prod?" and logsift returns:
 |----------|-------------|
 | **GCP Cloud Logging** | |
 | `LOGSIFT_GCP_PROJECTS` | Comma-separated GCP project IDs (uses ADC) |
-| `LOGSIFT_GCP_SERVICE_ACCOUNT_JSON` | Path to service account key file |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account key file (official GCP SDK) |
 | **Kubernetes** | |
 | `KUBECONFIG` | Path to kubeconfig (default: `~/.kube/config`) |
 | `LOGSIFT_KUBE_CONTEXT` | Kubernetes context to use (default: current) |
@@ -151,9 +160,41 @@ Ask your AI assistant "what errors are happening in prod?" and logsift returns:
 | `LOGSIFT_LOKI_PASSWORD` | Basic auth password |
 | `LOGSIFT_LOKI_BEARER_TOKEN` | Bearer token auth |
 | **AWS CloudWatch Logs** | |
-| `LOGSIFT_CW_REGION` | AWS region (e.g., `us-east-1`) |
-| `LOGSIFT_CW_PROFILE` | AWS SSO/config profile name |
+| `AWS_REGION` | AWS region (official AWS SDK, e.g., `us-east-1`) |
+| `AWS_PROFILE` | AWS SSO/config profile name (official AWS SDK) |
 | `LOGSIFT_CW_LOG_GROUP_PREFIX` | Default log group prefix (e.g., `/ecs/prod/`) |
+| **Axiom** | |
+| `AXIOM_TOKEN` | API token (`xaat-...`) or Personal Access Token (`xapt-...`) |
+| `AXIOM_ORG_ID` | Organization ID (required for Personal Access Tokens) |
+| `AXIOM_URL` | Custom API URL (default: `https://api.axiom.co`) |
+| **Azure Monitor** | |
+| `AZURE_TENANT_ID` | Azure AD tenant ID (also read by Azure SDK `DefaultAzureCredential`) |
+| `AZURE_CLIENT_ID` | Service principal app/client ID |
+| `AZURE_CLIENT_SECRET` | Client secret value |
+| `LOGSIFT_AZURE_WORKSPACE_ID` | Log Analytics workspace GUID |
+| **Datadog** | |
+| `DD_API_KEY` | API key (identifies organization) |
+| `DD_APP_KEY` | Application key (carries permissions) |
+| `DD_SITE` | Datadog site (e.g., `datadoghq.com`, `datadoghq.eu`) |
+| **Elasticsearch / OpenSearch** | |
+| `ELASTICSEARCH_URL` | Comma-separated cluster addresses (also read by go-elasticsearch SDK) |
+| `LOGSIFT_ES_USERNAME` | Basic auth username |
+| `LOGSIFT_ES_PASSWORD` | Basic auth password |
+| `LOGSIFT_ES_API_KEY` | API key (base64-encoded `id:api_key`) |
+| `LOGSIFT_ES_CLOUD_ID` | Elastic Cloud deployment ID |
+| **New Relic** | |
+| `NEW_RELIC_API_KEY` | User API key (`NRAK-...`) |
+| `NEW_RELIC_ACCOUNT_ID` | Account ID |
+| `NEW_RELIC_REGION` | `US` (default) or `EU` |
+| **Splunk** | |
+| `LOGSIFT_SPLUNK_URL` | Base URL (e.g., `https://splunk.example.com:8089`) |
+| `LOGSIFT_SPLUNK_TOKEN` | Bearer or Splunk auth token |
+| `LOGSIFT_SPLUNK_USERNAME` | Username for session-based auth |
+| `LOGSIFT_SPLUNK_PASSWORD` | Password for session-based auth |
+| **Sumo Logic** | |
+| `SUMOLOGIC_ACCESSID` | Access ID |
+| `SUMOLOGIC_ACCESSKEY` | Access Key |
+| `SUMOLOGIC_BASE_URL` | API endpoint (e.g., `https://api.us2.sumologic.com`) |
 
 ## MCP Tools
 
@@ -174,7 +215,7 @@ Search and reduce logs. Parameters:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `provider` | string | **Required.** `cloudwatch`, `gcp`, `kubernetes`, or `loki` |
+| `provider` | string | **Required.** `axiom`, `azuremonitor`, `cloudwatch`, `datadog`, `elasticsearch`, `gcp`, `kubernetes`, `loki`, `newrelic`, `splunk`, or `sumologic` |
 | `source` | string | Log source (namespace, log group, log name) |
 | `severity_min` | string | Minimum severity: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `CRITICAL` |
 | `text_filter` | string | Substring or regex to match in message body |
@@ -330,7 +371,7 @@ Beyond backends and consolidators:
 
 - **Reducer improvements** — Better noise detection, smarter Drain parameters, new consolidator types
 - **Output formats** — SARIF, structured markdown, other LLM-friendly formats
-- **Performance** — Parallel backend queries, streaming results
+- **Performance** — Streaming results, connection pooling
 - **Documentation** — Provider-specific setup guides, examples, usage patterns
 
 ## Architecture
@@ -347,10 +388,17 @@ format.go           — FormatText(), FormatJSON(), pagination cursors
 types.go            — Query, LogEntry, Cluster, Credentials, ReductionResult
 
 backend/
+  axiom/            — Axiom (APL over axiom-go SDK)
+  azuremonitor/     — Azure Monitor Log Analytics (KQL over Azure SDK)
+  cloudwatch/       — AWS CloudWatch Logs (FilterLogEvents)
+  datadog/          — Datadog (Log Search over datadog-api-client-go)
+  elasticsearch/    — Elasticsearch / OpenSearch (Query DSL over opensearch-go)
   gcp/              — GCP Cloud Logging (Advanced Logs Filter)
   kubernetes/       — Kubernetes pod logs (client-go)
   loki/             — Grafana Loki (LogQL over HTTP)
-  cloudwatch/       — AWS CloudWatch Logs (FilterLogEvents)
+  newrelic/         — New Relic (NRQL over NerdGraph GraphQL)
+  splunk/           — Splunk Enterprise/Cloud (SPL over REST API)
+  sumologic/        — Sumo Logic (Search Job API over REST)
 
 reducer/
   gostack.go        — Go runtime crash consolidator

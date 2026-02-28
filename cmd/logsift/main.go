@@ -1,5 +1,5 @@
 // Package main provides a stdio-based MCP server for searching and reducing
-// logs from GCP Cloud Logging, Kubernetes pod logs, Loki, and CloudWatch Logs.
+// logs across 11 cloud and infrastructure providers.
 //
 // Configure as an MCP server in Claude Code or any MCP-compatible client:
 //
@@ -11,25 +11,53 @@
 //	        "LOGSIFT_GCP_PROJECTS": "my-project-1,my-project-2",
 //	        "KUBECONFIG": "~/.kube/config",
 //	        "LOGSIFT_LOKI_ADDRESS": "http://localhost:3100",
-//	        "LOGSIFT_CW_REGION": "us-east-1"
+//	        "AWS_REGION": "us-east-1",
+//	        "DD_API_KEY": "your-api-key",
+//	        "DD_APP_KEY": "your-app-key"
 //	      }
 //	    }
 //	  }
 //	}
 //
-// Environment variables:
+// Environment variables (only set for backends you use):
 //
 //   - LOGSIFT_GCP_PROJECTS: Comma-separated GCP project IDs (uses ADC)
-//   - LOGSIFT_GCP_SERVICE_ACCOUNT_JSON: Path to service account key file
+//   - GOOGLE_APPLICATION_CREDENTIALS: Path to GCP service account key file (official GCP SDK)
 //   - KUBECONFIG: Path to kubeconfig file (defaults to ~/.kube/config)
 //   - LOGSIFT_KUBE_CONTEXT: Kubernetes context to use (defaults to current)
 //   - LOGSIFT_LOKI_ADDRESS: Loki base URL (e.g., http://localhost:3100)
 //   - LOGSIFT_LOKI_TENANT_ID: X-Scope-OrgID for multi-tenant Loki
 //   - LOGSIFT_LOKI_USERNAME: Basic auth username for Loki
 //   - LOGSIFT_LOKI_PASSWORD: Basic auth password for Loki
-//   - LOGSIFT_CW_REGION: AWS region for CloudWatch Logs (e.g., us-east-1)
-//   - LOGSIFT_CW_PROFILE: AWS SSO/config profile name (optional)
+//   - LOGSIFT_LOKI_BEARER_TOKEN: Bearer token auth for Loki
+//   - AWS_REGION: AWS region for CloudWatch Logs (official AWS SDK)
+//   - AWS_PROFILE: AWS SSO/config profile name (official AWS SDK)
 //   - LOGSIFT_CW_LOG_GROUP_PREFIX: Default log group prefix (e.g., /ecs/prod/)
+//   - AXIOM_TOKEN: Axiom API token (official SDK env var)
+//   - AXIOM_ORG_ID: Axiom organization ID (for personal tokens)
+//   - AXIOM_URL: Custom Axiom API URL
+//   - AZURE_TENANT_ID: Azure AD tenant ID (official SDK env var)
+//   - AZURE_CLIENT_ID: Azure service principal app/client ID
+//   - AZURE_CLIENT_SECRET: Azure client secret value
+//   - LOGSIFT_AZURE_WORKSPACE_ID: Azure Log Analytics workspace GUID
+//   - DD_API_KEY: Datadog API key (official env var)
+//   - DD_APP_KEY: Datadog application key
+//   - DD_SITE: Datadog site (e.g., datadoghq.com, datadoghq.eu)
+//   - ELASTICSEARCH_URL: Elasticsearch cluster addresses (official SDK env var)
+//   - LOGSIFT_ES_USERNAME: Elasticsearch basic auth username
+//   - LOGSIFT_ES_PASSWORD: Elasticsearch basic auth password
+//   - LOGSIFT_ES_API_KEY: Elasticsearch API key (base64 id:api_key)
+//   - LOGSIFT_ES_CLOUD_ID: Elastic Cloud deployment ID
+//   - NEW_RELIC_API_KEY: New Relic user API key (official env var)
+//   - NEW_RELIC_ACCOUNT_ID: New Relic account ID
+//   - NEW_RELIC_REGION: New Relic region (US or EU)
+//   - LOGSIFT_SPLUNK_URL: Splunk base URL (e.g., https://splunk:8089)
+//   - LOGSIFT_SPLUNK_TOKEN: Splunk auth token
+//   - LOGSIFT_SPLUNK_USERNAME: Splunk username
+//   - LOGSIFT_SPLUNK_PASSWORD: Splunk password
+//   - SUMOLOGIC_ACCESSID: Sumo Logic access ID (Terraform convention)
+//   - SUMOLOGIC_ACCESSKEY: Sumo Logic access key
+//   - SUMOLOGIC_BASE_URL: Sumo Logic API endpoint
 package main
 
 import (
@@ -39,6 +67,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,10 +75,17 @@ import (
 	"github.com/fulminate-io/logsift/mcpserver"
 
 	// Blank imports trigger backend and reducer init() registration.
+	_ "github.com/fulminate-io/logsift/backend/axiom"
+	_ "github.com/fulminate-io/logsift/backend/azuremonitor"
 	_ "github.com/fulminate-io/logsift/backend/cloudwatch"
+	_ "github.com/fulminate-io/logsift/backend/datadog"
+	_ "github.com/fulminate-io/logsift/backend/elasticsearch"
 	_ "github.com/fulminate-io/logsift/backend/gcp"
 	_ "github.com/fulminate-io/logsift/backend/kubernetes"
 	_ "github.com/fulminate-io/logsift/backend/loki"
+	_ "github.com/fulminate-io/logsift/backend/newrelic"
+	_ "github.com/fulminate-io/logsift/backend/splunk"
+	_ "github.com/fulminate-io/logsift/backend/sumologic"
 	_ "github.com/fulminate-io/logsift/reducer"
 )
 
@@ -84,9 +120,10 @@ func buildCredentials() *logsift.Credentials {
 	creds := &logsift.Credentials{}
 
 	// GCP: build project configs from env.
+	// GOOGLE_APPLICATION_CREDENTIALS is the official GCP SDK env var for SA key path.
 	if projects := os.Getenv("LOGSIFT_GCP_PROJECTS"); projects != "" {
 		var saJSON string
-		if saPath := os.Getenv("LOGSIFT_GCP_SERVICE_ACCOUNT_JSON"); saPath != "" {
+		if saPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); saPath != "" {
 			if data, err := os.ReadFile(saPath); err == nil {
 				saJSON = string(data)
 			}
@@ -137,15 +174,109 @@ func buildCredentials() *logsift.Credentials {
 		creds.LokiBearerToken = token
 	}
 
-	// CloudWatch Logs: load region, profile, and prefix from env.
-	if region := os.Getenv("LOGSIFT_CW_REGION"); region != "" {
+	// CloudWatch Logs: use official AWS SDK env vars.
+	if region := os.Getenv("AWS_REGION"); region != "" {
+		creds.CloudWatchRegion = region
+	} else if region := os.Getenv("AWS_DEFAULT_REGION"); region != "" {
 		creds.CloudWatchRegion = region
 	}
-	if profile := os.Getenv("LOGSIFT_CW_PROFILE"); profile != "" {
+	if profile := os.Getenv("AWS_PROFILE"); profile != "" {
 		creds.CloudWatchProfile = profile
 	}
 	if prefix := os.Getenv("LOGSIFT_CW_LOG_GROUP_PREFIX"); prefix != "" {
 		creds.CloudWatchLogGroupPrefix = prefix
+	}
+
+	// Axiom: use official AXIOM_* env vars (auto-read by axiom-go SDK too).
+	if token := os.Getenv("AXIOM_TOKEN"); token != "" {
+		creds.AxiomToken = token
+	}
+	if orgID := os.Getenv("AXIOM_ORG_ID"); orgID != "" {
+		creds.AxiomOrgID = orgID
+	}
+	if url := os.Getenv("AXIOM_URL"); url != "" {
+		creds.AxiomURL = url
+	}
+
+	// Azure Monitor: use official AZURE_* env vars for auth (read by DefaultAzureCredential),
+	// plus logsift-specific workspace ID.
+	if tenantID := os.Getenv("AZURE_TENANT_ID"); tenantID != "" {
+		creds.AzureTenantID = tenantID
+	}
+	if clientID := os.Getenv("AZURE_CLIENT_ID"); clientID != "" {
+		creds.AzureClientID = clientID
+	}
+	if clientSecret := os.Getenv("AZURE_CLIENT_SECRET"); clientSecret != "" {
+		creds.AzureClientSecret = clientSecret
+	}
+	if workspaceID := os.Getenv("LOGSIFT_AZURE_WORKSPACE_ID"); workspaceID != "" {
+		creds.AzureWorkspaceID = workspaceID
+	}
+
+	// Datadog: use official DD_* env vars.
+	if apiKey := os.Getenv("DD_API_KEY"); apiKey != "" {
+		creds.DatadogAPIKey = apiKey
+	}
+	if appKey := os.Getenv("DD_APP_KEY"); appKey != "" {
+		creds.DatadogAppKey = appKey
+	}
+	if site := os.Getenv("DD_SITE"); site != "" {
+		creds.DatadogSite = site
+	}
+
+	// Elasticsearch / OpenSearch: use official ELASTICSEARCH_URL for addresses.
+	if url := os.Getenv("ELASTICSEARCH_URL"); url != "" {
+		creds.ElasticsearchAddresses = strings.Split(url, ",")
+	}
+	if user := os.Getenv("LOGSIFT_ES_USERNAME"); user != "" {
+		creds.ElasticsearchUsername = user
+	}
+	if pass := os.Getenv("LOGSIFT_ES_PASSWORD"); pass != "" {
+		creds.ElasticsearchPassword = pass
+	}
+	if apiKey := os.Getenv("LOGSIFT_ES_API_KEY"); apiKey != "" {
+		creds.ElasticsearchAPIKey = apiKey
+	}
+	if cloudID := os.Getenv("LOGSIFT_ES_CLOUD_ID"); cloudID != "" {
+		creds.ElasticsearchCloudID = cloudID
+	}
+
+	// New Relic: use official NEW_RELIC_* env vars.
+	if apiKey := os.Getenv("NEW_RELIC_API_KEY"); apiKey != "" {
+		creds.NewRelicAPIKey = apiKey
+	}
+	if accountID := os.Getenv("NEW_RELIC_ACCOUNT_ID"); accountID != "" {
+		if id, err := strconv.Atoi(accountID); err == nil {
+			creds.NewRelicAccountID = id
+		}
+	}
+	if region := os.Getenv("NEW_RELIC_REGION"); region != "" {
+		creds.NewRelicRegion = region
+	}
+
+	// Splunk: no official SDK env vars, use LOGSIFT_SPLUNK_* prefix.
+	if url := os.Getenv("LOGSIFT_SPLUNK_URL"); url != "" {
+		creds.SplunkURL = url
+	}
+	if token := os.Getenv("LOGSIFT_SPLUNK_TOKEN"); token != "" {
+		creds.SplunkToken = token
+	}
+	if user := os.Getenv("LOGSIFT_SPLUNK_USERNAME"); user != "" {
+		creds.SplunkUsername = user
+	}
+	if pass := os.Getenv("LOGSIFT_SPLUNK_PASSWORD"); pass != "" {
+		creds.SplunkPassword = pass
+	}
+
+	// Sumo Logic: use SUMOLOGIC_* env vars (Terraform/Pulumi convention).
+	if accessID := os.Getenv("SUMOLOGIC_ACCESSID"); accessID != "" {
+		creds.SumoLogicAccessID = accessID
+	}
+	if accessKey := os.Getenv("SUMOLOGIC_ACCESSKEY"); accessKey != "" {
+		creds.SumoLogicAccessKey = accessKey
+	}
+	if url := os.Getenv("SUMOLOGIC_BASE_URL"); url != "" {
+		creds.SumoLogicURL = url
 	}
 
 	return creds
