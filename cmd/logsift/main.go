@@ -306,10 +306,12 @@ func handleSearchLogs(creds *logsift.Credentials, args json.RawMessage) *mcpserv
 	}
 
 	if input.Provider == "" {
-		// Pick the first available provider.
 		available := logsift.Available(creds)
-		if len(available) > 0 {
+		if len(available) == 1 {
 			input.Provider = available[0]
+		} else if len(available) > 1 {
+			return mcpserver.ErrorResult("Multiple providers configured (" +
+				strings.Join(available, ", ") + "). Specify which one with the 'provider' parameter.")
 		} else {
 			return mcpserver.ErrorResult("No provider specified and no credentials configured. Available backends: " +
 				strings.Join(logsift.RegisteredBackends(), ", "))
@@ -336,8 +338,11 @@ func handleListLogSources(creds *logsift.Credentials, args json.RawMessage) *mcp
 
 	if input.Provider == "" {
 		available := logsift.Available(creds)
-		if len(available) > 0 {
+		if len(available) == 1 {
 			input.Provider = available[0]
+		} else if len(available) > 1 {
+			return mcpserver.ErrorResult("Multiple providers configured (" +
+				strings.Join(available, ", ") + "). Specify which one with the 'provider' parameter.")
 		} else {
 			return mcpserver.ErrorResult("No provider specified and no credentials configured. Available backends: " +
 				strings.Join(logsift.RegisteredBackends(), ", "))
