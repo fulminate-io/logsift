@@ -92,8 +92,6 @@ import (
 var version = "dev"
 
 func main() {
-	creds := buildCredentials()
-
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 10*1024*1024), 10*1024*1024)
 
@@ -109,7 +107,7 @@ func main() {
 			continue
 		}
 
-		resp := handleRequest(creds, &req)
+		resp := handleRequest(&req)
 		if resp != nil {
 			writeResponse(resp)
 		}
@@ -282,7 +280,7 @@ func buildCredentials() *logsift.Credentials {
 	return creds
 }
 
-func handleRequest(creds *logsift.Credentials, req *mcpserver.Request) *mcpserver.Response {
+func handleRequest(req *mcpserver.Request) *mcpserver.Response {
 	switch req.Method {
 	case "initialize":
 		return mcpserver.NewResponse(req.ID, mcpserver.InitializeResult{
@@ -309,7 +307,7 @@ func handleRequest(creds *logsift.Credentials, req *mcpserver.Request) *mcpserve
 		if err := json.Unmarshal(req.Params, &params); err != nil {
 			return mcpserver.NewErrorResponse(req.ID, mcpserver.ErrCodeInvalidParams, "invalid params: "+err.Error(), nil)
 		}
-		result := callTool(creds, &params)
+		result := callTool(&params)
 		return mcpserver.NewResponse(req.ID, result)
 
 	case "ping":
@@ -391,6 +389,10 @@ func listTools() []mcpserver.Tool {
 						Type:        "integer",
 						Description: "Minimum occurrence count for a cluster to be classified as noise. 0 (default) auto-detects based on count distribution.",
 					},
+					"exact_time_range": {
+						Type:        "boolean",
+						Description: "If true, do not auto-expand the time window when zero results are found. Use when checking if specific logs exist in a precise time window.",
+					},
 				},
 				Required: []string{"provider"},
 			},
@@ -419,7 +421,11 @@ func listTools() []mcpserver.Tool {
 	}
 }
 
-func callTool(creds *logsift.Credentials, params *mcpserver.CallToolParams) *mcpserver.CallToolResult {
+func callTool(params *mcpserver.CallToolParams) *mcpserver.CallToolResult {
+	// Build credentials fresh on every request so env var changes
+	// (e.g., export AWS_PROFILE=prod) take effect without restarting.
+	creds := buildCredentials()
+
 	switch params.Name {
 	case "search_logs":
 		return handleSearchLogs(creds, params.Arguments)

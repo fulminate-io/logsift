@@ -30,6 +30,7 @@ func Search(ctx context.Context, provider string, creds *Credentials, input *Sea
 		return "", fmt.Errorf("unknown provider %q; registered: %s",
 			provider, strings.Join(RegisteredBackends(), ", "))
 	}
+
 	if !backend.Available(creds) {
 		available := Available(creds)
 		if len(available) == 0 {
@@ -78,16 +79,16 @@ func Search(ctx context.Context, provider string, creds *Credentials, input *Sea
 		timeRangeStr = "15m"
 	}
 
-	// Auto-expand time window on zero results.
-	results, guidance, err := autoExpandWindow(ctx, backend, creds, q, timeRangeStr)
+	// Query with time window (auto-expand unless exact_time_range is set).
+	expanded, err := autoExpandWindow(ctx, backend, creds, q, timeRangeStr, input.ExactTimeRange)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return FormatTimeout(provider, "30s"), nil
 		}
 		return "", fmt.Errorf("error querying %s: %w", provider, err)
 	}
-	if guidance != "" {
-		return guidance, nil
+	if expanded.guidance != "" {
+		return expanded.guidance, nil
 	}
 
 	// Compile user-provided suppress patterns.
@@ -99,6 +100,7 @@ func Search(ctx context.Context, provider string, creds *Credentials, input *Sea
 	}
 
 	// Run reduction pipeline.
+	results := expanded.results
 	sampled := results.TotalEstimate > len(results.Entries) && results.TotalEstimate > 0
 	reduction := Reduce(results.Entries, ReductionOpts{
 		SeverityMin:      q.SeverityMin,
@@ -124,9 +126,9 @@ func Search(ctx context.Context, provider string, creds *Credentials, input *Sea
 	}
 
 	if input.Mode == "json" {
-		return FormatJSON(reduction, provider, input.Source, timeRangeStr), nil
+		return FormatJSON(reduction, provider, input.Source, expanded.actualRange), nil
 	}
-	return FormatText(reduction, provider, input.Source, timeRangeStr), nil
+	return FormatText(reduction, provider, input.Source, expanded.actualRange), nil
 }
 
 // SearchRaw queries the specified provider and returns raw log entries
@@ -156,10 +158,31 @@ func ListSources(ctx context.Context, provider string, creds *Credentials, prefi
 	return backend.ListSources(ctx, creds, prefix)
 }
 
-func autoExpandWindow(ctx context.Context, b Backend, creds *Credentials, q *Query, requestedRange string) (*RawResults, string, error) {
+// autoExpandResult holds the results and metadata from autoExpandWindow.
+type autoExpandResult struct {
+	results    *RawResults
+	guidance   string
+	actualRange string
+}
+
+func autoExpandWindow(ctx context.Context, b Backend, creds *Credentials, q *Query, requestedRange string, exact bool) (*autoExpandResult, error) {
 	duration, err := time.ParseDuration(requestedRange)
 	if err != nil || duration <= 0 {
 		duration = 15 * time.Minute
+	}
+
+	// When exact_time_range is set, only search the requested window.
+	if exact {
+		end := time.Now()
+		start := end.Add(-duration)
+		q.EndTime = end
+		q.StartTime = start
+
+		results, err := b.Search(ctx, creds, q)
+		if err != nil {
+			return nil, err
+		}
+		return &autoExpandResult{results: results, actualRange: formatDuration(duration)}, nil
 	}
 
 	windows := expandWindows(duration)
@@ -172,10 +195,14 @@ func autoExpandWindow(ctx context.Context, b Backend, creds *Credentials, q *Que
 
 		results, err := b.Search(ctx, creds, q)
 		if err != nil {
-			return nil, "", err
+			return nil, err
 		}
 		if len(results.Entries) > 0 {
-			return results, "", nil
+			actual := formatDuration(w)
+			if w != duration {
+				actual += fmt.Sprintf(" (expanded from %s)", formatDuration(duration))
+			}
+			return &autoExpandResult{results: results, actualRange: actual}, nil
 		}
 	}
 
@@ -188,7 +215,7 @@ func autoExpandWindow(ctx context.Context, b Backend, creds *Credentials, q *Que
 			"  - Check if the service was running during this period\n",
 		formatWindowList(windows), q.Provider, q.Source,
 	)
-	return &RawResults{}, guidance, nil
+	return &autoExpandResult{results: &RawResults{}, guidance: guidance, actualRange: formatDuration(duration)}, nil
 }
 
 func expandWindows(requested time.Duration) []time.Duration {
@@ -201,6 +228,16 @@ func expandWindows(requested time.Duration) []time.Duration {
 		}
 	}
 	return windows
+}
+
+func formatDuration(d time.Duration) string {
+	if d >= time.Hour {
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	if d >= time.Minute {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%ds", int(d.Seconds()))
 }
 
 func formatWindowList(windows []time.Duration) string {

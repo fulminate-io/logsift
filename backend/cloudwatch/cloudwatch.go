@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -36,6 +37,8 @@ type cwInstance struct {
 }
 
 // Available returns true when at least one CloudWatch instance is configured.
+// Also detects standard AWS SDK env vars (AWS_REGION, AWS_DEFAULT_REGION)
+// so users don't need logsift-specific config when AWS credentials are already set.
 func (b *cwBackend) Available(creds *logsift.Credentials) bool {
 	if creds == nil {
 		return false
@@ -49,6 +52,10 @@ func (b *cwBackend) Available(creds *logsift.Credentials) bool {
 		if inst.Region != "" {
 			return true
 		}
+	}
+	// Detect standard AWS env vars — the SDK will use them automatically.
+	if os.Getenv("AWS_REGION") != "" || os.Getenv("AWS_DEFAULT_REGION") != "" {
+		return true
 	}
 	return false
 }
@@ -211,6 +218,22 @@ func (b *cwBackend) resolveInstances(creds *logsift.Credentials) []cwInstance {
 		}}
 	}
 
+	// Detect standard AWS env vars — let the SDK resolve region and credentials.
+	if region := os.Getenv("AWS_REGION"); region != "" {
+		return []cwInstance{{
+			name:           "default",
+			region:         region,
+			logGroupPrefix: creds.CloudWatchLogGroupPrefix,
+		}}
+	}
+	if region := os.Getenv("AWS_DEFAULT_REGION"); region != "" {
+		return []cwInstance{{
+			name:           "default",
+			region:         region,
+			logGroupPrefix: creds.CloudWatchLogGroupPrefix,
+		}}
+	}
+
 	return nil
 }
 
@@ -247,7 +270,7 @@ func (b *cwBackend) searchInstance(ctx context.Context, inst cwInstance, q *logs
 
 	logGroupName := resolveLogGroup(q, inst)
 	if logGroupName == "" {
-		return nil, fmt.Errorf("cloudwatch: no log group specified (use 'source' parameter or set LOGSIFT_CW_LOG_GROUP_PREFIX)")
+		return nil, fmt.Errorf("cloudwatch: no log group specified (use 'source' parameter or set LOGSIFT_CW_LOG_GROUP_PREFIX env var)")
 	}
 
 	input := &cloudwatchlogs.FilterLogEventsInput{

@@ -66,21 +66,31 @@ Add to your MCP client config (e.g., `~/.claude.json` for Claude Code):
 {
   "mcpServers": {
     "logsift": {
+      "command": "logsift"
+    }
+  }
+}
+```
+
+logsift reads credentials from your shell environment automatically — if you already have `AWS_PROFILE`, `DD_API_KEY`, `KUBECONFIG`, etc. set, it just works. Env vars are re-read on every request, so changes like `export AWS_PROFILE=prod` take effect immediately without restarting.
+
+You can also pin env vars in the MCP config if you prefer:
+
+```json
+{
+  "mcpServers": {
+    "logsift": {
       "command": "logsift",
       "env": {
-        "LOGSIFT_LOKI_ADDRESS": "http://localhost:3100",
-        "AWS_REGION": "us-east-1",
         "LOGSIFT_GCP_PROJECTS": "my-project",
-        "DD_API_KEY": "your-api-key",
-        "DD_APP_KEY": "your-app-key",
-        "KUBECONFIG": "~/.kube/config"
+        "LOGSIFT_LOKI_ADDRESS": "http://localhost:3100"
       }
     }
   }
 }
 ```
 
-Only set env vars for the backends you use — logsift auto-detects which backends are available based on configured credentials. See [Configuration](#configuration) for the full list.
+See [Configuration](#configuration) for the full list of env vars.
 
 ## Example Output
 
@@ -226,6 +236,7 @@ Search and reduce logs. Parameters:
 | `severity_keywords` | string[] | Extra words that uplift INFO→WARN (e.g., `["quota", "throttle"]`) |
 | `suppress_patterns` | string[] | Regex patterns to collapse into noise (e.g., `["health.check"]`) |
 | `noise_threshold` | integer | Min count for noise classification. `0` = auto-detect |
+| `exact_time_range` | boolean | If true, don't auto-expand the time window on zero results |
 | `cursor` | string | Pagination cursor from a previous call |
 | `mode` | string | Output format: `text` (default) or `json` |
 

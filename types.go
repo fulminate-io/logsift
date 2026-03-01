@@ -251,6 +251,9 @@ type SearchLogsInput struct {
 	TokenBudget  int               `json:"token_budget,omitempty"`
 	Cursor       string            `json:"cursor,omitempty"`
 
+	// Time window behavior.
+	ExactTimeRange bool `json:"exact_time_range,omitempty"` // If true, do not auto-expand the time window on zero results
+
 	// Reducer tuning (optional, for domain-specific control).
 	SuppressPatterns []string `json:"suppress_patterns,omitempty"` // Regex patterns to collapse into noise summary
 	SeverityKeywords []string `json:"severity_keywords,omitempty"` // Extra words that trigger INFO→WARN uplift

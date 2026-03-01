@@ -21,12 +21,8 @@ setup: build
 		jq --arg bin "$(BINPATH)" '.mcpServers.logsift = {"command": $$bin}' $(SETTINGS) > $(SETTINGS).tmp \
 		&& mv $(SETTINGS).tmp $(SETTINGS); \
 		echo "Added logsift MCP server to $(SETTINGS)"; \
-		echo "Set env vars in $(SETTINGS) as needed:"; \
-		echo "  LOGSIFT_GCP_PROJECTS    - comma-separated GCP project IDs"; \
-		echo "  KUBECONFIG              - path to kubeconfig (default: ~/.kube/config)"; \
-		echo "  LOGSIFT_LOKI_ADDRESS    - Loki base URL (e.g., http://localhost:3100)"; \
-		echo "  LOGSIFT_LOKI_TENANT_ID  - X-Scope-OrgID for multi-tenant Loki"; \
-		echo "  LOGSIFT_CW_REGION       - AWS region for CloudWatch Logs (e.g., us-east-1)"; \
-		echo "  LOGSIFT_CW_PROFILE      - AWS SSO/config profile (optional)"; \
-		echo "  LOGSIFT_CW_LOG_GROUP_PREFIX - Default log group prefix (e.g., /ecs/prod/)"; \
+		echo ""; \
+		echo "logsift reads env vars from your shell automatically (e.g., AWS_PROFILE, DD_API_KEY)."; \
+		echo "No extra configuration needed if your env vars are already set."; \
+		echo "See README.md for the full list of supported env vars."; \
 	fi
